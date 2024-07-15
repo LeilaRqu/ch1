@@ -207,7 +207,7 @@ physeq.clr.euc.adonis.int <- adonis2(asvs.clr~treatment*year*month, data=smd.clr
 
 #PCoA and permanova of 2023 samples
 #subset 2023 samples from clr phyloseq object, pull out ASV table and sample data
-phyloseq.clr.23 <- subset_samples(phyloseq.clr, year=='2023')
+phyloseq.clr.23 <- subset_samples(phyloseq.clr, year=='2023') #this is wrong, need, to recalc distance matrix for 23 only
 asv.clr.23 <- as(otu_table(phyloseq.clr.23), 'matrix')
 smd.clr.23 <- as(sample_data(phyloseq.2023), 'data.frame')
 
