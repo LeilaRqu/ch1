@@ -2,20 +2,21 @@
 ####Analysis of soil properties and fungal community####
 ########################################################
 
+#setwd
+setwd("/Users/leilarquibi/Desktop/microbiomes")
+
 #install and load packages
 if(!require('BiocManger', quietyl = TRUE))
   install.packages('BiocManager')
 
 packages <- c('phyloseq', 'stringr', 'tidyverse', 'genefilter',
-              'vegan', 'lattice', 'ape', 'ALDEx2', 'devtools', 'ggpubr')
+              'vegan', 'lattice', 'ape', 'ALDEx2', 'devtools', 'ggpubr', 
+              'factoextra', 'corrplot')
 BiocManager::install(packages)
 lapply(packages, require, character.only = TRUE)
 
 install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis")
 library(pairwiseAdonis)
-
-#setwd
-setwd("/Users/leilarquibi/Desktop/microbiomes")
 
 ####Create Phyloseq Object####
 #load in ASV table
@@ -72,6 +73,9 @@ sample_data(phyloseq)$depth <- sample_sums(phyloseq)
 #save phyloseq object to RDS
 saveRDS(phyloseq, file = 'phyloseq.RDS')
 
+#read in phyloseq object in subsequent sessions
+phyloseq <- readRDS('phyloseq.RDS')
+
 ####Quality control####
 #rarefaction curve to confirm adequate sampling effort
 rarecurve(as(otu_table(phyloseq), 'matrix'), step=100, label=FALSE)
@@ -83,6 +87,12 @@ phyloseq.thresh <- filter_taxa(phyloseq, threshold, prune=TRUE)
 #check that thresholding reduced number of taxa observed
 ntaxa(phyloseq)
 ntaxa(phyloseq.thresh)
+
+#save
+saveRDS(phyloseq.thresh, file = 'phyloseq.thresh.RDS')
+
+#read in thresholded phyloseq in subsequent sessions
+phyloseq.thresh <- readRDS('phyloseq.thresh.RDS')
 
 ####Data exploration####
 #taxonomic makeup of samples
@@ -380,3 +390,46 @@ ggplot(data=relamf.crop, aes(x=Abundance, y=poxc))+
   geom_point()+
   geom_smooth(method='lm')+
   labs(x='Relative Abundance of AMF')
+
+####PCA of soil factors v diversity ####
+ps.sd <- as(sample_data(phyloseq), 'data.frame') %>% 
+  filter(poxc != 'NA') %>% 
+  filter(no3 != 'NA') %>% 
+  filter(nh4 != 'NA') %>% 
+  filter(po4 != 'NA')
+row.names(ps.sd) <- NULL
+ps.num <- ps.sd %>%
+  column_to_rownames(var = 'sample') %>% 
+  dplyr::select(chao1, poxc, no3, nh4, po4) %>% 
+  na.omit()
+
+pca <- prcomp(ps.num, scale=TRUE)
+
+print(pca)
+summary(pca)
+
+eig <- get_eigenvalue(pca) #extract eigenvalues (percent variation explained by each principal component)
+eig
+
+fviz_eig(pca, col.var='blue') #scree plot
+
+#extract pca results (list of matrices containing results for each variable)
+var <- get_pca_var(pca)
+var
+head(var$cos2) #gives info on quality of respresentation of variables (higher vals = better)
+fviz_cos2(pca, choice = 'var', axes=1:2)
+
+#plot correlation matrix of variables
+corrplot(var$cos2, is.corr = FALSE)
+
+#plot PCA
+fviz_pca_var(pca, repel=TRUE)
+
+fviz_pca_ind(pca, repel=TRUE)
+
+fviz_pca_biplot(pca, 
+                col.ind = ps.sd$treatment, 
+                addEllipses=TRUE,
+                col.var='black',
+                repel=TRUE)
+
