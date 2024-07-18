@@ -391,13 +391,39 @@ ggplot(data=relamf.crop, aes(x=Abundance, y=poxc))+
   geom_smooth(method='lm')+
   labs(x='Relative Abundance of AMF')
 
-####PCA of soil factors v diversity ####
+####Soil factors v diversity ####
 ps.sd <- as(sample_data(phyloseq), 'data.frame') %>% 
   filter(poxc != 'NA') %>% 
   filter(no3 != 'NA') %>% 
   filter(nh4 != 'NA') %>% 
   filter(po4 != 'NA')
 row.names(ps.sd) <- NULL
+
+#NO3 v diversity
+lmno3div <- lm(no3~chao1, data=ps.sd)
+summary(lmno3div)
+
+ggplot(data=ps.sd, aes(x=chao1, y=no3))+
+  geom_point()+
+  geom_smooth(method='lm')
+
+#NH4 v diversity
+lmnh4div <- lm(nh4~chao1, data = ps.sd)
+summary(lmnh4div)
+
+ggplot(data=ps.sd, aes(x=chao1, y=nh4))+
+  geom_point()+
+  geom_smooth(method='lm')
+
+#PO4 v diversity
+lmpo4div <- lm(po4~chao1, data = ps.sd)
+summary(lmpo4div)
+
+ggplot(data=ps.sd, aes(x=chao1, y=po4))+
+  geom_point()+
+  geom_smooth(method='lm')
+
+#PCA
 ps.num <- ps.sd %>%
   column_to_rownames(var = 'sample') %>% 
   dplyr::select(chao1, poxc, no3, nh4, po4) %>% 
