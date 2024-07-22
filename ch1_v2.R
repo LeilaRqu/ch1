@@ -400,7 +400,7 @@ ps.sd <- as(sample_data(phyloseq), 'data.frame') %>%
 row.names(ps.sd) <- NULL
 
 #NO3 v diversity
-lmno3div <- lm(no3~chao1, data=ps.sd)
+lmno3div <- lm(chao1~no3, data=ps.sd)
 summary(lmno3div)
 
 ggplot(data=ps.sd, aes(x=chao1, y=no3))+
@@ -408,7 +408,7 @@ ggplot(data=ps.sd, aes(x=chao1, y=no3))+
   geom_smooth(method='lm')
 
 #NH4 v diversity
-lmnh4div <- lm(nh4~chao1, data = ps.sd)
+lmnh4div <- lm(chao1~nh4, data = ps.sd)
 summary(lmnh4div)
 
 ggplot(data=ps.sd, aes(x=chao1, y=nh4))+
@@ -416,10 +416,32 @@ ggplot(data=ps.sd, aes(x=chao1, y=nh4))+
   geom_smooth(method='lm')
 
 #PO4 v diversity
-lmpo4div <- lm(po4~chao1, data = ps.sd)
+lmpo4div <- lm(chao1~po4, data = ps.sd)
 summary(lmpo4div)
 
 ggplot(data=ps.sd, aes(x=chao1, y=po4))+
+  geom_point()+
+  geom_smooth(method='lm')
+
+#diversity v combined N
+ps.sd <- ps.sd %>% 
+  mutate(combinedN = no3+nh4)
+
+lmndiv <- lm(chao1 ~ combinedN, data=ps.sd)
+summary(lmndiv)
+
+ggplot(data=ps.sd, aes(x=combinedN, y=chao1))+
+  geom_point()+
+  geom_smooth(method='lm')
+
+#diversity v N/p ration
+ps.sd <- ps.sd %>% 
+  mutate(NP = combinedN/po4)
+
+lmnpdiv <- lm(chao1~NP, data=ps.sd)
+summary(lmnpdiv)
+
+ggplot(data=ps.sd, aes(x=NP, y=chao1))+
   geom_point()+
   geom_smooth(method='lm')
 
