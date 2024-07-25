@@ -6,7 +6,7 @@
 setwd("/Users/leilarquibi/Desktop/microbiomes")
 
 #install and load packages
-if(!require('BiocManger', quietyl = TRUE))
+if(!require('BiocManger', quietly = TRUE))
   install.packages('BiocManager')
 
 packages <- c('phyloseq', 'stringr', 'tidyverse', 'genefilter',
