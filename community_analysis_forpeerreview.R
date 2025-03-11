@@ -19,10 +19,10 @@ setwd("/Users/leilarquibi/Desktop/microbiomes")
 
 ####Phyloseq basics####
 #load in ASV table
-asvs <- readRDS("dada2_output/seqtab.nochim.RDS")
+asvs <- readRDS("seqtab.nochim.RDS")
 
 #load in taxonomy table
-tax <- readRDS("dada2_output/taxa_fungi.RDS")
+tax <- readRDS("taxa_fungi.RDS")
 
 #load in sample metadata
 smd <- read.csv("SampleData.csv")
@@ -80,11 +80,24 @@ plot_bar(phyloseq,fill='Phylum')
 plot_bar(phyloseq_thresholded,fill='Phylum')
 
 #taxonomic makeup of samples with phyla as proportions of community
+phyloseq.prop <- transform_sample_counts(phyloseq, function(asv) asv/sum(asv))
 phyloseq.thresh.prop <- transform_sample_counts(phyloseq.thresh, function(asv) asv/sum(asv))
-p <- plot_bar(phyloseq.thresh.prop, fill='Phylum')
+p <- plot_bar(phyloseq.thresh.prop, fill='Phylum', facet_grid=~treatment)
 desired_order = c(1:47, 49:83)
 p$data$Sample <- factor(p$data$Sample, levels = desired_order)
 print(p)
+
+pspka <- subset_samples(phyloseq.thresh.prop, treatment=='KA')
+pspkz <- subset_samples(phyloseq.thresh.prop, treatment=='KZ')
+pspp <- subset_samples(phyloseq.thresh.prop, treatment=='prairie')
+pspr <- subset_samples(phyloseq.thresh.prop, treatment=='restored')
+pspw <- subset_samples(phyloseq.thresh.prop, treatment=='wheat')
+
+pka <- plot_bar(pspka, fill='Phylum', facet_grid =  ~year)
+pkz <- plot_bar(pspkz, fill='Phylum', facet_grid =  ~year)
+pp <- plot_bar(pspp, fill='Phylum', facet_grid =  ~year)
+pr <- plot_bar(pspr, fill='Phylum', facet_grid =  ~year)
+pw <- plot_bar(pspw, fill='Phylum', facet_grid =  ~year)
 
 ####Alpha diversity of whole fungal community#####
 #calculate alpha diversity of each sample
@@ -94,7 +107,11 @@ richness <- estimate_richness(phyloseq)
 phyloseq.crop <- phyloseq %>% 
   subset_samples(treatment %in% c('KA', 'KZ', 'wheat'))
 year.shannon <- as.factor(sample_data(phyloseq.crop)$year)
-plot_richness(phyloseq.crop, x='year', measures=c('Shannon'), color=year.shannon)+
+plot_richness(phyloseq.crop, x='year', measures=c('Chao1'))+
+  geom_boxplot(fill=NA, aes(group=year))+
+  facet_wrap(~treatment)+
+  ylab('Chao richness of soil fungal community')
+plot_richness(phyloseq.crop, x='year', measures=c('Shannon'))+
   geom_boxplot(fill=NA, aes(group=year))+
   facet_wrap(~treatment)+
   ylab('Shannon diversity of soil fungal community')
@@ -135,7 +152,10 @@ plot_richness(physeq.2018, x= 'treatment', measures=c('Shannon'), color=trt.2018
 #plot alpha diversity across treatments in 2023
 physeq.2023 <- subset_samples(phyloseq, year=="2023")
 trt.23 <- as.factor(sample_data(physeq.2023)$treatment)
-plot_richness(physeq.2023, x='treatment', measures=c('Shannon'), color=trt.23)+
+plot_richness(physeq.2023, x='treatment', measures=c('Chao1'))+
+  geom_boxplot(fill=NA)+
+  ylab('Chao richness of soil fungal community')
+plot_richness(physeq.2023, x='treatment', measures=c('Shannon'))+
   geom_boxplot(fill=NA)+
   ylab('Shannon diversity of soil fungal community')
 
@@ -192,9 +212,17 @@ phyloseq.clr <- phyloseq(asvs.clr, tax, smd)
 ordinate(phyloseq.clr, distance='euclidean',method='PCoA') -> phyloseq.clr.euclid.pcoa
 
 #PCoA plot of whole funal community dissimilarity between all samples using Aitchison distance, colored by treatment
+sample_data(phyloseq.clr)$year <- as.factor(sample_data(phyloseq.clr)$year)
+levels(sample_data(phyloseq.clr)$year)
+
+plot_ordination(phyloseq.clr, phyloseq.clr.euclid.pcoa, type='samples', 
+                color='treatment', shape='year')
+
 plot_ordination(phyloseq.clr, phyloseq.clr.euclid.pcoa, type='samples', color='treatment')+
   facet_wrap(~year)+
   stat_ellipse(level=0.95)
+
+  
 
 #Permanova to test for effect of crop trt, year, month, on whole fungal community#
 asvs.clr <- as(otu_table(phyloseq.clr),'matrix')
@@ -234,10 +262,10 @@ amf <- subset_taxa(phyloseq, Phylum=="p__Glomeromycota")
 amf.crop<- amf %>% subset_samples(treatment %in% c('KA', 'KZ', 'wheat'))
 year.amf.crop <- as.factor(sample_data(amf.crop)$year)
 
-plot_richness(amf.crop, x='year', measures='Observed', color=year.amf.crop)+
+plot_richness(amf.crop, x='year', measures='Observed')+
   geom_boxplot(fill=NA, aes(group=year.amf.crop))+
   facet_wrap(~treatment)+
-    ylab('AMF species richness')
+    ylab('Number of ASVs: AMF')
 
 #lm of richness ~ year in KA
 amf.KA <- subset_samples(amf, treatment=='KA')
@@ -268,6 +296,10 @@ amf.23 <- subset_samples(amf, year=='2023')
 richness.amf.23 <- estimate_richness(amf.23, measures='Observed')
 aov.amf.23 <- aov(richness.amf.23$Observed ~ sample_data(amf.23)$treatment)
 summary(aov.amf.23)
+
+plot_richness(amf.23, x='treatment', measures='Observed')+
+  geom_boxplot(fill=NA, aes(group=treatment))+
+  ylab('Number of ASVs: AMF')
 
 #Compare relative abundance of AMF between years within cropping treatments
 #starting with clr/thresholded phyloseq object
@@ -310,7 +342,27 @@ ggplot(amf.df.23, aes(x=treatment, y=Abundance, col=treatment))+
   ylab('Relative abundance of AMF')
 
 
+####trying with just proportions, not clr
+phyloseq.prop <- tax_glom(phyloseq.prop, taxrank=rank_names(phyloseq.prop)[2])
+amfp <- subset_taxa(phyloseq.prop, Phylum=='p__Glomeromycota')
 
+amfp.df <- psmelt(amfp)
+head(amfp.df)
+amfp.df.23 <- amfp.df %>% 
+  filter(year=='2023')
+amfp.df.crop <- amfp.df %>% 
+  filter(treatment %in% c('KA', 'KZ', 'wheat'))
+amfp.df.crop$year <- as.factor(amfp.df.crop$year)
+
+
+ggplot(data=amfp.df.crop, aes(x=year, y=Abundance, group=year))+
+  geom_boxplot(fill=NA)+
+  facet_wrap(~treatment)+
+  ylab('Relative abundance of AMF')
+
+ggplot(data=amfp.df.23, aes(x=treatment, y=Abundance))+
+  geom_boxplot(fill=NA)+
+  ylab('Relative abundance of AMF')
 
 
 
