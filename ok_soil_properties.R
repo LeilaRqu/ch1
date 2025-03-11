@@ -36,7 +36,7 @@ agg_crop <- aggdata %>% filter(trt != 'prairie' &
                                  trt != 'NA') %>% 
   filter(mwd!='NA')
 
-ggplot(agg_crop, aes(x=year, y=mwd, color=trt))+
+lmwd <- ggplot(agg_crop, aes(x=year, y=mwd, color=trt))+
   geom_point(aes(shape=as.factor(month)))+
   geom_smooth(method='lm')+
   theme_bw()
@@ -82,7 +82,7 @@ lmaggL3 <- lme(data=agg_crop, Lmacro~year,
                random=~1|block, method = 'ML')
 summary(lmaggL3) #best model
 
-ggplot(data=agg_crop, aes(x=year, y=Lmacro, color=trt))+
+plmac <- ggplot(data=agg_crop, aes(x=year, y=Lmacro, color=trt))+
   geom_point(aes(shape=as.factor(month)))+
   geom_smooth(method='lm')+
   theme_bw()
@@ -99,7 +99,7 @@ lmaggS3 <- lme(data=agg_crop, Smacro~year/month,
                random=~1|block, method = 'ML')
 summary(lmaggS3) #lower BIC than lmaggs2, technically best fit
 
-ggplot(data=agg_crop, aes(x=year, y=Smacro, color=trt))+
+psmac <- ggplot(data=agg_crop, aes(x=year, y=Smacro, color=trt))+
   geom_point(aes(shape=as.factor(month)))+
   geom_smooth(method='lm')+
   theme_bw()
@@ -113,38 +113,43 @@ lmaggmi2 <- lme(data=agg_crop, micro ~ trt:year/month,
                 random=~1|block, method = 'ML')
 summary(lmaggmi2) #everything significant here, better AIC/BIC
 
-ggplot(data=agg_crop, aes(x=year, y=micro, color=trt))+
+pmic <- ggplot(data=agg_crop, aes(x=year, y=micro, color=trt))+
   geom_point(aes(shape=as.factor(month)))+
   geom_smooth(method='lm')+
   theme_bw()
 
+#plot all lms together
+ggarrange(nrow=2, ncol=2, common.legend = TRUE,
+          lmwd, plmac, psmac, pmic)
 ####Final year comparison####
 #mwd between treatments
 agg23 <- aggdata %>% filter(year=='2023') %>% na.omit()
 aggaov <- aov(data = agg23, mwd ~ trt)
 summary(aggaov)
 
-ggplot(agg23, aes(x=trt, y=mwd, fill=trt))+
+pmwd <- ggplot(agg23, aes(x=trt, y=mwd, fill=trt))+
   geom_boxplot()
 #%L between treatments
 Laov <- aov(data = agg23, Lmacro ~ trt)
 summary(Laov)
 
-ggplot(agg23, aes(x=trt, y=Lmacro, fill=trt))+
+pL <- ggplot(agg23, aes(x=trt, y=Lmacro, fill=trt))+
   geom_boxplot()
 #%M between treatments
 Saov <- aov(data = agg23, Smacro ~ trt)
 summary(Saov)
 
-ggplot(agg23, aes(x=trt, y=Smacro, fill=trt))+
+pM <- ggplot(agg23, aes(x=trt, y=Smacro, fill=trt))+
   geom_boxplot()
 #%S between treatments
 miaov <- aov(data=agg23, micro ~ trt)
 summary(miaov)
 
-ggplot(agg23, aes(x=trt, y=micro, fill=trt))+
+pS <-ggplot(agg23, aes(x=trt, y=micro, fill=trt))+
   geom_boxplot()
 
+ggarrange(ncol=2, nrow=2, pmwd, pL, pM, pS,
+          common.legend = TRUE)
 ####Nutrients over time####
 data <- read.csv('SampleData.csv')
 data[c('block', 'plot')] <-str_split_fixed(data$plot, '', 2)
@@ -153,7 +158,7 @@ crop <- data %>% filter(treatment=='wheat'|treatment=='KZ'|treatment=='KA')
 
 #####poxc####
 cropc <- crop %>% filter(poxc != 'NA')
-ggplot(data=cropc, aes(x=year, y=poxc, color=treatment))+
+pc <- ggplot(data=cropc, aes(x=year, y=poxc, color=treatment))+
   geom_point(aes(shape=as.factor(month)))+
   geom_smooth(method='lm')+
   theme_bw()
@@ -172,7 +177,7 @@ summary(lmc3) #best fit
 
 ####no3####
 cropni <- crop %>% filter(no3 != 'NA')
-ggplot(data=cropni, aes(x=year, y=no3, color=treatment))+
+pni <- ggplot(data=cropni, aes(x=year, y=no3, color=treatment))+
   geom_point(aes(shape=as.factor(month)))+
   geom_smooth(method='lm')+
   theme_bw()
@@ -191,7 +196,7 @@ summary(lmni3) #all sig
 
 ####phosphate####
 cropp <- crop %>% filter(po4 != 'NA')
-ggplot(data=cropp, aes(x=year, y=po4, color=treatment))+
+pp <- ggplot(data=cropp, aes(x=year, y=po4, color=treatment))+
   geom_point(aes(shape=as.factor(month)))+
   geom_smooth(method='lm')+
   theme_bw()
@@ -214,7 +219,7 @@ summary(lmp4) #lower bic
 
 ####ammonium####
 cropa <- crop %>% filter(nh4!='NA')
-ggplot(data=cropa, aes(x=year, y=nh4, color=treatment))+
+pa <- ggplot(data=cropa, aes(x=year, y=nh4, color=treatment))+
   geom_point(aes(shape=as.factor(month)))+
   geom_smooth(method='lm')+
   theme_bw()
@@ -235,6 +240,10 @@ lma4 <- lme(data=cropa, nh4~treatment:year,
             random=~1|block)
 summary(lma4) #significant interactions but higher aic, and same effect size for every trt??
 
+#plot all together
+ggarrange(nrow=2, ncol=2,
+          common.legend = TRUE,
+          pc, pa, pni, pp)
 ####5 yr comparison####
 cropc23 <- cropc %>% filter(year=='2023')
 aovc <- aov(data=cropc23, poxc~treatment)
@@ -251,3 +260,17 @@ summary(aovp) #no sig diff
 cropa23 <- cropa %>% filter(year=='2023')
 aova <- aov(data=cropa23, nh4~treatment)
 summary(aova) #no sig diff
+
+data23 <- data %>% filter(year=='2023')
+bc <- ggplot(data23, aes(x=treatment, y=poxc, fill=treatment))+
+  geom_boxplot()
+ba <- ggplot(data23, aes(x=treatment, y=nh4, fill=treatment))+
+  geom_boxplot()
+bni <- ggplot(data23, aes(x=treatment, y=no3, fill=treatment))+
+  geom_boxplot()
+bp <- ggplot(data23, aes(x=treatment, y=po4, fill=treatment))+
+  geom_boxplot()
+ggarrange(nrow=2, ncol=2,
+          common.legend=TRUE,
+          bc, ba, bni, bp)
+
