@@ -15,7 +15,7 @@ library(ALDEx2)
 library(pairwiseAdonis)
 
 #setwd
-setwd("/Users/leilarquibi/Desktop/microbiomes")
+setwd("/Users/leilarquibi/Desktop/oldkernza")
 
 ####Phyloseq basics####
 #load in ASV table
@@ -101,74 +101,63 @@ pw <- plot_bar(pspw, fill='Phylum', facet_grid =  ~year)
 
 ####Alpha diversity of whole fungal community#####
 #calculate alpha diversity of each sample
-richness <- estimate_richness(phyloseq)
+estimate_richness(phyloseq)
 
 #plot alpha diversity across samples (non-thresholded count data) by year
 phyloseq.crop <- phyloseq %>% 
   subset_samples(treatment %in% c('KA', 'KZ', 'wheat'))
+richness <- estimate_richness(phyloseq.crop)
+richness$sample <- row.names(richness)
+richness$sample <- str_replace(richness$sample, "X", "")
 year.shannon <- as.factor(sample_data(phyloseq.crop)$year)
-plot_richness(phyloseq.crop, x='year', measures=c('Chao1'))+
-  geom_boxplot(fill=NA, aes(group=year))+
+pchao <- plot_richness(phyloseq.crop, x='year', measures=c('Chao1'))+
+  geom_boxplot(fill=NA, aes(group=year, color=as.factor(year)))+
   facet_wrap(~treatment)+
-  ylab('Chao richness of soil fungal community')
-plot_richness(phyloseq.crop, x='year', measures=c('Shannon'))+
-  geom_boxplot(fill=NA, aes(group=year))+
+  ylab('Species richness of soil fungal community (Chao)')
+pshannon<- plot_richness(phyloseq.crop, x='year', measures=c('Shannon'))+
+  geom_boxplot(fill=NA, aes(group=year, color=as.factor(year)))+
   facet_wrap(~treatment)+
-  ylab('Shannon diversity of soil fungal community')
+  ylab('Diversity of soil fungal community (Shannon)')
+ggarrange(nrow=1, ncol=2, common.legend=TRUE, 
+          pchao, pshannon)
 
-#lm of richness ~ year in KA
-physeq.KA <- subset_samples(phyloseq, treatment=="KA")
-sample_data(physeq.KA)$year <- as.numeric(sample_data(physeq.KA)$year)
-richness.KA <- estimate_richness(physeq.KA)
-hist(richness.KA$Shannon) #make sure data are reasonably normally distributed
-lm.KA <- lm(richness.KA$Shannon ~ sample_data(physeq.KA)$year)
-summary(lm.KA)
+#mixed linear model of richness~year
+cropsd <- as.matrix(sample_data(phyloseq.crop))
+cropsd <- as.data.frame(cropsd)
+cropsd$year <- as.numeric(cropsd$year)
+cropsd$chao1 <- as.numeric(cropsd$chao1)
+richmodel <- lme(data=cropsd, chao1 ~ year*treatment,
+                 random = ~1|plot/month)
+summary(richmodel)
 
-#lm of richness ~ year in KZ
-physeq.KZ <- subset_samples(phyloseq, treatment=="KZ")
-sample_data(physeq.KZ)$year <- as.numeric(sample_data(physeq.KZ)$year)
-richness.KZ <- estimate_richness(physeq.KZ)
-hist(richness.KZ$Shannon) #make sure data are reasonably normally distributed
-lm.KZ <- lm(richness.KZ$Shannon ~ sample_data(physeq.KZ)$year)
-summary(lm.KZ)
-
-
-#lm of richness ~ year in wheat
-physeq.wheat <- subset_samples(phyloseq, treatment=="wheat")
-sample_data(physeq.wheat)$year <- as.numeric(sample_data(physeq.wheat)$year)
-richness.wheat <- estimate_richness(physeq.wheat)
-hist(richness.wheat$Shannon) #make sure data are reasonably normally distributed
-glm.wheat <- lm(richness.wheat$Shannon ~ sample_data(physeq.wheat)$year)
-summary(glm.wheat)
-
-
-#plot alpha diversity across treatments in 2018
-physeq.2018 <- subset_samples(phyloseq, year == '2018')
-trt.2018 <- as.factor(sample_data(physeq.2018)$treatment)
-plot_richness(physeq.2018, x= 'treatment', measures=c('Shannon'), color=trt.2018)+
-  geom_boxplot(fill=NA)+
-  ylab('Shannon diversity of soil fungal community')
+#mixed linear model of shannon~year
+cropsd$shannon <- as.numeric(cropsd$shannon)
+shanmodel <- lme(data=cropsd,shannon ~ year*treatment,
+                 random = ~1|plot/month)
+summary(shanmodel)
 
 #plot alpha diversity across treatments in 2023
 physeq.2023 <- subset_samples(phyloseq, year=="2023")
-trt.23 <- as.factor(sample_data(physeq.2023)$treatment)
-plot_richness(physeq.2023, x='treatment', measures=c('Chao1'))+
-  geom_boxplot(fill=NA)+
+chao23 <- plot_richness(physeq.2023, x='treatment', measures=c('Chao1'))+
+  geom_boxplot(fill=NA, aes(color=treatment))+
   ylab('Chao richness of soil fungal community')
-plot_richness(physeq.2023, x='treatment', measures=c('Shannon'))+
-  geom_boxplot(fill=NA)+
+shan23 <- plot_richness(physeq.2023, x='treatment', measures=c('Shannon'))+
+  geom_boxplot(fill=NA, aes(color=treatment))+
   ylab('Shannon diversity of soil fungal community')
+ggarrange(nrow=1, ncol=2, common.legend=TRUE,
+          chao23, shan23)
 
-#aov to compare alpha diversity across treatments in 2018
-richness.2018 <- estimate_richness(physeq.2018)
-aov.2018 <- aov(richness.2018$Shannon ~ sample_data(physeq.2018)$treatment)
-summary(aov.2018)
+#aov of rich/div across trt in 2023
+ps23 <- as.matrix(sample_data(physeq.2023))
+ps23 <- as.data.frame(ps23)
 
-#aov to compare alpha diversity across treatments in 2023
-richness.2023 <- estimate_richness(physeq.2023)
-aov.2023 <- aov(richness.2023$Shannon ~ sample_data(physeq.2023)$treatment)
-summary(aov.2023)
-TukeyHSD(aov.2023)
+aovc23 <- aov(data=ps23, chao1~treatment)
+summary(aovc23)
+TukeyHSD(aovc23)
+
+aovs23 <- aov(data=ps23, shannon~treatment)
+summary(aovs23)
+TukeyHSD(aovs23)
 
 #####Beta diversity of whole fungal community####
 #input: QC'd ASV table (thresholded, but before zero removal) as matrix (rows=ASVs)
@@ -223,15 +212,23 @@ plot_ordination(phyloseq.clr, phyloseq.clr.euclid.pcoa, type='samples', color='t
   stat_ellipse(level=0.95)
 
   
-
 #Permanova to test for effect of crop trt, year, month, on whole fungal community#
 asvs.clr <- as(otu_table(phyloseq.clr),'matrix')
 smd.clr <- as(sample_data(phyloseq.clr), 'data.frame')
 
 set.seed(8)
 asvs.clr <- t(asvs.clr)
-physeq.clr.euc.adonis <- adonis2(asvs.clr~treatment+year+month, data=smd.clr, method='euclidean', by='margin')
-physeq.clr.euc.adonis.int <- adonis2(asvs.clr~treatment*year*month, data=smd.clr, method='euclidean', by='margin')
+physeq.clr.euc.adonis1 <- adonis2(asvs.clr~year*treatment,
+                                 strata=smd.clr$plot:smd.clr$month,
+                                 data=smd.clr,
+                                 method='euclidean', 
+                                 by='margin') #all sig
+
+physeq.clr.euc.adonis2 <- adonis2(asvs.clr~year+treatment+month,
+                                  strata=smd.clr$plot,
+                                  data=smd.clr,
+                                  method='euclidean', 
+                                  by='margin') #all sig
 
 #PCoA and permanova of 2023 samples
 #subset 2023 samples from clr phyloseq object, pull out ASV table and sample data
@@ -262,34 +259,22 @@ amf <- subset_taxa(phyloseq, Phylum=="p__Glomeromycota")
 amf.crop<- amf %>% subset_samples(treatment %in% c('KA', 'KZ', 'wheat'))
 year.amf.crop <- as.factor(sample_data(amf.crop)$year)
 
-plot_richness(amf.crop, x='year', measures='Observed')+
-  geom_boxplot(fill=NA, aes(group=year.amf.crop))+
+amfrich <- plot_richness(amf.crop, x='year', measures='Observed')+
+  geom_boxplot(fill=NA, aes(group=year.amf.crop, 
+                            color=year.amf.crop))+
   facet_wrap(~treatment)+
     ylab('Number of ASVs: AMF')
 
-#lm of richness ~ year in KA
-amf.KA <- subset_samples(amf, treatment=='KA')
-sample_data(amf.KA)$year <- as.numeric(sample_data(amf.KA)$year)
-richness.amf.KA <- estimate_richness(amf.KA, measures = 'Observed')
-hist(richness.amf.KA$Observed) #check that distribution is reasonably normal-- very zero inflated
-lm.amf.ka <- lm(richness.amf.KA$Observed ~ sample_data(amf.KA)$year)
-summary(lm.amf.ka)
+#linear mixed model for AMF richness over time
+sample_data(amf.crop)$amfrich <- estimate_richness(amf.crop, measures='Observed')
+amfrichsd <- as.matrix(sample_data(amf.crop))
+amfrichsd <- as.data.frame(amfrichsd)
+amfrichsd$amfrich <- as.numeric(amfrichsd$amfrich)
+amfrichsd$year <- as.numeric(amfrichsd$year)
 
-#lm of richness ~ year in KZ
-amf.KZ <- subset_samples(amf, treatment=='KZ')
-sample_data(amf.KZ)$year <- as.numeric(sample_data(amf.KZ)$year)
-richness.amf.KZ <- estimate_richness(amf.KZ, measures = 'Observed')
-hist(richness.amf.KZ$Observed) #check that distribution is reasonably normal-- very zero inflated
-lm.amf.kz <- lm(richness.amf.KZ$Observed ~ sample_data(amf.KZ)$year)
-summary(lm.amf.kz)
-
-#lm of richness ~ year in wheat
-amf.wheat <- subset_samples(amf, treatment=='wheat')
-sample_data(amf.wheat)$year <- as.numeric(sample_data(amf.wheat)$year)
-richness.amf.wheat <- estimate_richness(amf.wheat, measures = 'Observed')
-hist(richness.amf.wheat$Observed) #check that distribution is reasonably normal-- very zero inflated
-lm.amf.wheat <- lm(richness.amf.wheat$Observed ~ sample_data(amf.wheat)$year)
-summary(lm.amf.wheat)
+amfrichmodel <- lme(data=amfrichsd, amfrich ~ treatment*year,
+                    random = ~1|plot/month)
+summary(amfrichmodel)
 
 #aov of richness ~ treatment in 2023 samples
 amf.23 <- subset_samples(amf, year=='2023')
@@ -297,8 +282,8 @@ richness.amf.23 <- estimate_richness(amf.23, measures='Observed')
 aov.amf.23 <- aov(richness.amf.23$Observed ~ sample_data(amf.23)$treatment)
 summary(aov.amf.23)
 
-plot_richness(amf.23, x='treatment', measures='Observed')+
-  geom_boxplot(fill=NA, aes(group=treatment))+
+amfrich23 <- plot_richness(amf.23, x='treatment', measures='Observed')+
+  geom_boxplot(fill=NA, aes(group=treatment, color=treatment))+
   ylab('Number of ASVs: AMF')
 
 #Compare relative abundance of AMF between years within cropping treatments
@@ -345,28 +330,44 @@ ggplot(amf.df.23, aes(x=treatment, y=Abundance, col=treatment))+
 ####trying with just proportions, not clr
 phyloseq.prop <- tax_glom(phyloseq.prop, taxrank=rank_names(phyloseq.prop)[2])
 amfp <- subset_taxa(phyloseq.prop, Phylum=='p__Glomeromycota')
+amfpcrop <- subset_samples(amfp, treatment != 'prairie' 
+                           & treatment != 'restored')
 
 amfp.df <- psmelt(amfp)
+amfp.crop <- psmelt(amfpcrop)
 head(amfp.df)
+
+#lmm prop AMF over time
+amfpropmodel <- lme(data=amfp.crop, Abundance ~ treatment*year,
+                    random= ~1|plot/month)
+summary(amfpropmodel)
+
+#aov differences in prop AMF yr 5
 amfp.df.23 <- amfp.df %>% 
   filter(year=='2023')
-amfp.df.crop <- amfp.df %>% 
-  filter(treatment %in% c('KA', 'KZ', 'wheat'))
-amfp.df.crop$year <- as.factor(amfp.df.crop$year)
 
+amfp23model <- aov(data=amfp.df.23, Abundance ~ treatment)
+summary(amfp23model)
 
-ggplot(data=amfp.df.crop, aes(x=year, y=Abundance, group=year))+
-  geom_boxplot(fill=NA)+
+#plot amf prop over time and year 5
+amfprop <- ggplot(data=amfp.crop, aes(x=year, y=Abundance, group=year))+
+  geom_point()+
+  geom_boxplot(fill=NA, aes(color=as.factor(year)))+
   facet_wrap(~treatment)+
   ylab('Relative abundance of AMF')
 
-ggplot(data=amfp.df.23, aes(x=treatment, y=Abundance))+
-  geom_boxplot(fill=NA)+
+amfprop23 <- ggplot(data=amfp.df.23, aes(x=treatment, y=Abundance))+
+  geom_boxplot(fill=NA, aes(color=treatment))+
   ylab('Relative abundance of AMF')
 
+#plot amfrichnes and prop over time together
+ggarrange(nrow=1, ncol=2,
+          common.legend = TRUE,
+          amfrich, amfprop)
 
-
-
+#plot amf rich and prop y5 together
+ggarrange(nrow=1, ncol=2, common.legend = TRUE,
+          amfrich23, amfprop23)
 
 
 
