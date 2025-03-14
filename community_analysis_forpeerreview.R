@@ -13,6 +13,8 @@ library(lattice)
 library(ape)
 library(ALDEx2)
 library(pairwiseAdonis)
+library(ggpubr)
+library(dendexten)
 
 #setwd
 setwd("/Users/leilarquibi/Desktop/oldkernza")
@@ -98,6 +100,16 @@ pkz <- plot_bar(pspkz, fill='Phylum', facet_grid =  ~year)
 pp <- plot_bar(pspp, fill='Phylum', facet_grid =  ~year)
 pr <- plot_bar(pspr, fill='Phylum', facet_grid =  ~year)
 pw <- plot_bar(pspw, fill='Phylum', facet_grid =  ~year)
+
+pka2 <- plot_bar(pspka, fill='Phylum')+xlab('KA')
+pkz2 <- plot_bar(pspkz, fill='Phylum')+xlab('KZ')
+pp2 <- plot_bar(pspp, fill='Phylum')+xlab('Experimental Prairie')
+pr2 <- plot_bar(pspr, fill='Phylum')+xlab('Restored Prairie')
+pw2 <- plot_bar(pspw, fill='Phylum')+xlab('AW')
+
+ggarrange(nrow=2, ncol=3, common.legend=TRUE,
+          legend='right',
+          pka2, pkz2, pp2, pr2, pw2)
 
 ####Alpha diversity of whole fungal community#####
 #calculate alpha diversity of each sample
@@ -196,11 +208,12 @@ for (i in 1:ntaxa(tax)) { #iteration for each asv
   if (i==ntaxa(tax)) {saveRDS(ASVkey.tax, 'ASVkey.RDS')} #once every ASV is nicknamed, save key to RDS file
 }
 phyloseq.clr <- phyloseq(asvs.clr, tax, smd)
+saveRDS(phyloseq.clr, file = 'phyloseq.clr.RDS')
 
 #create ordination object
 ordinate(phyloseq.clr, distance='euclidean',method='PCoA') -> phyloseq.clr.euclid.pcoa
 
-#PCoA plot of whole funal community dissimilarity between all samples using Aitchison distance, colored by treatment
+#PCoA plot of whole fungal community dissimilarity between all samples using Aitchison distance, colored by treatment
 sample_data(phyloseq.clr)$year <- as.factor(sample_data(phyloseq.clr)$year)
 levels(sample_data(phyloseq.clr)$year)
 
@@ -208,21 +221,23 @@ plot_ordination(phyloseq.clr, phyloseq.clr.euclid.pcoa, type='samples',
                 color='treatment', shape='year')
 
 plot_ordination(phyloseq.clr, phyloseq.clr.euclid.pcoa, type='samples', color='treatment')+
-  facet_wrap(~year)+
   stat_ellipse(level=0.95)
 
-  
-#Permanova to test for effect of crop trt, year, month, on whole fungal community#
+#Permanova to test for effect of crop trt, year, month, on whole fungal community, all samples#
 asvs.clr <- as(otu_table(phyloseq.clr),'matrix')
 smd.clr <- as(sample_data(phyloseq.clr), 'data.frame')
 
 set.seed(8)
 asvs.clr <- t(asvs.clr)
+perm <- how(within=Within(type='free'), 
+                plots = Plots(strata=smd.clr$plot), 
+                nperm=888)
 physeq.clr.euc.adonis1 <- adonis2(asvs.clr~year*treatment,
-                                 strata=smd.clr$plot:smd.clr$month,
-                                 data=smd.clr,
-                                 method='euclidean', 
-                                 by='margin') #all sig
+                                  strata=smd.clr$plot, #look at perm instead potentially (permute package, set permutations)
+                                  data=smd.clr,
+                                  method='euclidean', 
+                                  by='margin') #all sig
+aov(physeq.clr.euc.adonis1)
 
 physeq.clr.euc.adonis2 <- adonis2(asvs.clr~year+treatment+month,
                                   strata=smd.clr$plot,
@@ -230,9 +245,92 @@ physeq.clr.euc.adonis2 <- adonis2(asvs.clr~year+treatment+month,
                                   method='euclidean', 
                                   by='margin') #all sig
 
+#PCoA of crops only, comparing ellipses for trt v year
+phyloseq.clr.crop <- subset_samples(phyloseq.clr, treatment %in% c('KZ','KA','wheat'))
+ordinate(phyloseq.clr.crop, distance = 'euclidean', method='PCoA') -> ps.crop.dist
+sample_data(phyloseq.clr.crop)$year <- as.factor(sample_data(phyloseq.clr.crop)$year)
+pcoacroptrt <- plot_ordination(phyloseq.clr.crop, ps.crop.dist, type='samples', color='treatment')+
+  stat_ellipse(level=0.95)
+pcoacropyr <- plot_ordination(phyloseq.clr.crop, ps.crop.dist, type='samples', color='year')+
+  stat_ellipse(level=0.95)
+
+ggarrange(nrow=1, ncol=2, pcoacroptrt, pcoacropyr)
+
+#permanova for crops
+asvs.clr.crop <- as(otu_table(phyloseq.clr.crop),'matrix')
+smd.clr.crop <- as(sample_data(phyloseq.clr.crop), 'data.frame')
+
+set.seed(888)
+asvs.clr.crop <- t(asvs.clr.crop)
+permcrop <- how(within=Within(type='free'), 
+                plots = Plots(strata=smd.clr.crop$plot), 
+                nperm=888)
+
+permanovacrop <- adonis2(asvs.clr.crop ~ treatment*year,
+                         data=smd.clr.crop,
+                         method='euclidean',
+                         permutations=permcrop)
+
 #PCoA and permanova of 2023 samples
+phyloseq.clr.23 <- subset_samples(phyloseq.clr, year == '2023')
+ordinate(phyloseq.clr.23, distance = 'euclidean', method='PCoA') -> ps.23.dist
+
+pcoacroptrt <- plot_ordination(phyloseq.clr.23, ps.23.dist, type='samples', color='treatment')+
+  stat_ellipse(level=0.95)
+
+asvs.clr.23 <- as(otu_table(phyloseq.clr.23), 'matrix')
+asvs.clr.23 <- t(asvs.clr.23)
+smd.clr.23 <- as(sample_data(phyloseq.clr.23), 'data.frame')
+
+set.seed(888)
+perm23 <- how(within=Within(type='free'),
+              plots = Plots(strata=smd.clr.23$plot),
+              nperm=888)
+permanova23 <- adonis2(asvs.clr.23 ~ treatment,
+                       data=smd.clr.23,
+                       method='euclidean',
+                       permutations=perm23)
+
+####dendrogram####
+#calculate distance matrix
+dist_mat <- distance(phyloseq.clr, method = 'euclidean', type='samples')
+#build hierarchical cluster object
+hclust_avg <- hclust(dist_mat, method = 'average')
+plot(hclust_avg)
+
+#make dendrogram
+dend <- as.dendrogram(hclust_avg)
+dend %>% hang.dendrogram(hang = -1) %>% 
+
+#change names to match trt/year
+smd.df <- as.matrix(smd)
+smd.df <- as.data.frame(smd.df)
+smd.df <- smd.df %>% mutate(unique = paste(treatment,year))
+labels(dend) <- smd.df$unique[order.dendrogram(dend)]
+
+#change label color to match trt
+labelCol <- function(x) {
+  if (is.leaf(x)) {
+    ## fetch label
+    label <- attr(x, "label") 
+    ## set label color to red for A and B, to blue otherwise
+    attr(x, "nodePar") <- list(lab.col=case_when(grepl('wheat', label) ~ 'firebrick4',
+                                              grepl('KZ', label) ~ 'darkgoldenrod2',
+                                              grepl('KA', label) ~'darkgoldenrod4',
+                                              grepl('prairie', label)~'olivedrab3',
+                                              grepl('restored', label)~'darkgreen'))
+  }
+  return(x)
+}
+
+dend <- dendrapply(dend, labelCol)
+
+#plot
+plot(dend)
+title(ylab='Euclidean Distance')
+
 #subset 2023 samples from clr phyloseq object, pull out ASV table and sample data
-phyloseq.clr.23 <- subset_samples(phyloseq.clr, year=='2023') #this is wrong, need, to recalc distance matrix for 23 only
+phyloseq.clr.23 <- subset_samples(phyloseq.clr, year=='2023')
 asv.clr.23 <- as(otu_table(phyloseq.clr.23), 'matrix')
 smd.clr.23 <- as(sample_data(phyloseq.2023), 'data.frame')
 
