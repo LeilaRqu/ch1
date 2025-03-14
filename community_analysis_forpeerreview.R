@@ -14,7 +14,7 @@ library(ape)
 library(ALDEx2)
 library(pairwiseAdonis)
 library(ggpubr)
-library(dendexten)
+library(dendextend)
 
 #setwd
 setwd("/Users/leilarquibi/Desktop/oldkernza")
@@ -28,6 +28,7 @@ tax <- readRDS("taxa_fungi.RDS")
 
 #load in sample metadata
 smd <- read.csv("SampleData.csv")
+smd <- smd %>% mutate(unique = paste(treatment, year))
 
 #format data for phyloseq
 asvs <- otu_table(asvs, taxa_are_rows = FALSE) 
@@ -63,6 +64,9 @@ taxa_names(phyloseq)
 #save phyloseq object to RDS
 saveRDS(phyloseq, file = 'phyloseq.RDS')
 
+#read in if already saved
+phyloseq <- readRDS('phyloseq.RDS')
+
 ####Quality control####
 #rarefaction curve to confirm adequate sampling effort
 rarecurve(as(otu_table(phyloseq), 'matrix'), step=100, label=FALSE)
@@ -71,15 +75,21 @@ rarecurve(as(otu_table(phyloseq), 'matrix'), step=100, label=FALSE)
 threshold <- kOverA(k=10, A=1) #remove ASVs that appear less than 10 times in at least 1 sample
 phyloseq.thresh <- filter_taxa(phyloseq, threshold, prune=TRUE)
 
+
 #check that thresholding reduced number of taxa observed
 ntaxa(phyloseq)
 ntaxa(phyloseq.thresh)
 
+#save
+saveRDS(phyloseq.thresh, file = 'phyloseq.thresh.RDS')
+
+#read in if already saved
+phyloseq.thresh <- readRDS('phyloseq.thresh.RDS')
 
 ####Data exploration
 #taxonomic makeup of samples
 plot_bar(phyloseq,fill='Phylum')
-plot_bar(phyloseq_thresholded,fill='Phylum')
+plot_bar(phyloseq.thresh,fill='Phylum')
 
 #taxonomic makeup of samples with phyla as proportions of community
 phyloseq.prop <- transform_sample_counts(phyloseq, function(asv) asv/sum(asv))
@@ -89,6 +99,14 @@ desired_order = c(1:47, 49:83)
 p$data$Sample <- factor(p$data$Sample, levels = desired_order)
 print(p)
 
+#redo with informative label names
+phyloseq.thresh.prop.p <- tax_glom(phyloseq.thresh.prop, taxrank = rank_names(phyloseq.thresh.prop)[2] )
+p2 <- plot_bar(phyloseq.thresh.prop.p, fill = 'Phylum')
+p2 + scale_x_discrete(labels = p2$data$unique) +geom_bar(stat='identity')
+p2+scale_x_discrete(labels=p2$data$sample)
+
+
+#separate plots for each trt
 pspka <- subset_samples(phyloseq.thresh.prop, treatment=='KA')
 pspkz <- subset_samples(phyloseq.thresh.prop, treatment=='KZ')
 pspp <- subset_samples(phyloseq.thresh.prop, treatment=='prairie')
