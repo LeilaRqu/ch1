@@ -132,6 +132,8 @@ ggarrange(nrow=2, ncol=3, common.legend=TRUE,
 ####Alpha diversity of whole fungal community#####
 #calculate alpha diversity of each sample
 estimate_richness(phyloseq)
+sample_data(phyloseq)$chao1 <- estimate_richness(phyloseq)$Chao1
+sample_data(phyloseq)$shannon <- estimate_richness(phyloseq)$Shannon
 
 #plot alpha diversity across samples (non-thresholded count data) by year
 phyloseq.crop <- phyloseq %>% 
@@ -245,7 +247,7 @@ plot_ordination(phyloseq.clr, phyloseq.clr.euclid.pcoa, type='samples', color='t
 asvs.clr <- as(otu_table(phyloseq.clr),'matrix')
 smd.clr <- as(sample_data(phyloseq.clr), 'data.frame')
 
-set.seed(8)
+set.seed(888)
 asvs.clr <- t(asvs.clr)
 perm <- how(within=Within(type='free'), 
                 plots = Plots(strata=smd.clr$plot), 
