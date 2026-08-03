@@ -29,6 +29,9 @@ tax <- readRDS("taxa_fungi.RDS")
 #load in sample metadata
 smd <- read.csv("SampleData.csv")
 smd <- smd %>% mutate(unique = paste(treatment, year))
+smd <- smd %>% mutate(percentOC = str_remove_all(percentOC, '%'))
+smd$percentOC <- as.numeric(smd$percentOC)
+smd$MBC <- as.numeric(smd$MBC)
 
 #format data for phyloseq
 asvs <- otu_table(asvs, taxa_are_rows = FALSE) 
@@ -229,6 +232,8 @@ for (i in 1:ntaxa(tax)) { #iteration for each asv
 }
 phyloseq.clr <- phyloseq(asvs.clr, tax, smd)
 saveRDS(phyloseq.clr, file = 'phyloseq.clr.RDS')
+#read in for next time
+phyloseq.clr <- readRDS('phyloseq.clr.RDS')
 
 #create ordination object
 ordinate(phyloseq.clr, distance='euclidean',method='PCoA') -> phyloseq.clr.euclid.pcoa
@@ -310,6 +315,38 @@ permanova23 <- adonis2(asvs.clr.23 ~ treatment,
                        data=smd.clr.23,
                        method='euclidean',
                        permutations=perm23)
+
+####RDA####
+soilrda <- rda(t(asvs.clr)~poxc+MBC,
+               data=smd.clr,
+               na.action = na.omit)
+print(soilrda) #constrained variables (the soil stuff) explains 5.62% of variation
+anova(soilrda) #model is significant: p=0.001
+
+plot(soilrda, type='none')
+points(soilrda, display='sites',
+       col=as.factor(smd.clr$treatment),
+       pch = 19)
+text(soilrda, display='bp')
+
+#RDA without restored prairie bc i dont want that
+phyloseq.clr.less <- subset_samples(phyloseq.clr, treatment != 'prairie')
+
+asvs.clr.less <- as(otu_table(phyloseq.clr.less),'matrix')
+smd.clr.less <- as(sample_data(phyloseq.clr.less), 'data.frame')
+
+
+rdaless <- rda(t(asvs.clr.less)~poxc+MBC,
+               data=smd.clr.less,
+               na.action = na.omit)
+print(rdaless)
+anova(rdaless)
+
+plot(rdaless, type='none')
+points(rdaless, display='sites',
+       col=as.factor(smd.clr.less$treatment),
+       pch = 19)
+text(soilrda, display='bp')
 
 ####dendrogram####
 #calculate distance matrix
